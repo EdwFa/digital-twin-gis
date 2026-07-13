@@ -2,9 +2,10 @@ from models.passport import PatientPassport_GIS
 
 class GISParameters:
     def __init__(self):
-        # Default reference values
-        self.S_I = 5.0e-4
-        self.adipose_SI = 1.0e-4
+        # Default reference multipliers
+        self.muscle_SI = 1.0
+        self.adipose_SI = 1.0
+        self.liver_SI = 1.0
         self.beta_mass = 1.0
         self.V_G = 16.0 # L
         self.V_I = 12.0 # L
@@ -22,9 +23,10 @@ def calibrate_patient(passport: PatientPassport_GIS) -> GISParameters:
     
     HOMA_IR_ref = (5.0 * 10.0) / 22.5 # Reference normal
     
-    # 1. Insulin Resistance Shift
-    params.S_I = params.S_I * (HOMA_IR_ref / HOMA_IR)
-    params.adipose_SI = params.adipose_SI * (HOMA_IR_ref / HOMA_IR)
+    # 1. Insulin Resistance Shift (All tissues)
+    params.muscle_SI *= (HOMA_IR_ref / HOMA_IR)
+    params.adipose_SI *= (HOMA_IR_ref / HOMA_IR)
+    params.liver_SI *= (HOMA_IR_ref / HOMA_IR)
     
     # 2. Volumes of distribution (Liters)
     params.V_G = 0.18 * passport.weight_kg
@@ -36,11 +38,12 @@ def calibrate_patient(passport: PatientPassport_GIS) -> GISParameters:
     
     # 4. Physical activity modifications
     muscle_SI_factor = 1.0 + 0.05 * min(passport.physical_activity_MET_h_week, 15)
-    params.S_I *= muscle_SI_factor
+    params.muscle_SI *= muscle_SI_factor
     
     # 5. Age modifications
     age_factor_SI = 1.0 - 0.005 * max(0, passport.age - 40)
-    params.S_I *= age_factor_SI
+    params.muscle_SI *= age_factor_SI
+    params.liver_SI *= age_factor_SI
     
     # 6. Glucotoxicity (T2D reduction in beta cell capacity)
     if passport.HbA1c_percent > 6.5:

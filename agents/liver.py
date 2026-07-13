@@ -4,22 +4,51 @@ from .base import BaseAgent
 class LiverAgent(BaseAgent):
     def __init__(self, blood_pool, message_bus):
         super().__init__("Liver", blood_pool, message_bus)
-        self.egp_fasting = 0.179 # Tuned to balance Brain + Muscle at resting G=5.0
-        self.f_liver = 0.0001
+        self.egp_fasting = 0.179 # Endogenous Glucose Production at fasting (mmol/L/min)
+        self.liver_SI = 1.0 # Liver insulin sensitivity
         
+        # Glycogen Pool (Capacity equivalent in mmol/L: ~100g / 16L = ~35.0 mmol/L)
+        self.max_glycogen = 35.0
+        self.glycogen_pool = 25.0 # ~70% full at start
+        
+        self.k_uptake = 0.0001 # Rate constant for insulin-dependent glucose uptake
+
     def calculate_delta(self, current_time, step_size, blood_state, messages):
-        g = blood_state["glucose"]
-        i = blood_state["insulin"]
-        glu = blood_state["glucagon"]
+        from models.messages import AdaptationMsg
+        for msg in messages:
+            if isinstance(msg, AdaptationMsg):
+                self.liver_SI = msg.insulin_sensitivity_multiplier
+
+        g = max(0.1, blood_state["glucose"])
+        i = max(0.1, blood_state["insulin"])
+        glu = max(0.1, blood_state["glucagon"])
         
-        # EGP: Suppressed by insulin, stimulated by glucagon
-        insulin_factor = math.exp(-0.01 * (i - 60.0))
-        glucagon_factor = math.exp(0.01 * (glu - 70.0))
+        # Basal ratios (30% GNG, 70% GGL)
+        GNG_basal = 0.3 * self.egp_fasting
+        GGL_basal = 0.7 * self.egp_fasting
         
-        egp = self.egp_fasting * insulin_factor * glucagon_factor
+        # Hormonal multipliers
+        i_factor = max(0.1, (i / 60.0) * self.liver_SI)
+        glu_factor = glu / 50.0
+        hormonal_drive = glu_factor / i_factor
         
-        # Uptake by liver (insulin dependent)
-        u_liver = self.f_liver * i * g
+        # 1. Gluconeogenesis (GNG)
+        GNG = GNG_basal * hormonal_drive
         
-        net_delta = egp - u_liver
-        self.blood_pool.add_glucose_delta(net_delta)
+        # 2. Glycogenolysis (GGL)
+        GGL = GGL_basal * hormonal_drive
+        if self.glycogen_pool < 5.0:
+            GGL *= max(0.0, self.glycogen_pool / 5.0) # Linearly drops to 0
+            
+        # 3. Glucose Uptake (Glycogenesis)
+        # capacity_factor: slows down uptake sharply as pool gets close to max
+        capacity_factor = max(0.0, 1.0 - (self.glycogen_pool / self.max_glycogen)**4)
+        uptake = self.k_uptake * g * i * self.liver_SI * capacity_factor
+        
+        # Apply to local pool
+        self.glycogen_pool += (uptake - GGL) * step_size
+        self.glycogen_pool = max(0.0, min(self.max_glycogen, self.glycogen_pool))
+        
+        # Add net glucose to blood (GNG + GGL - uptake)
+        net_glucose_flux = GNG + GGL - uptake
+        self.blood_pool.add_glucose_delta(net_glucose_flux)

@@ -27,3 +27,8 @@ class GISStateMsg:
     incretin_pmol_L: float
     ffa_mmol_L: float
     # We will expand this as we add more agents
+
+@dataclass
+class AdaptationMsg:
+    beta_mass_multiplier: float
+    insulin_sensitivity_multiplier: float

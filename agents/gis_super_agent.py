@@ -47,10 +47,11 @@ class GISSuperAgent:
         
         for agent in self.subagents:
             if agent.name == "Muscle":
-                agent.S_I = params.S_I
+                agent.muscle_SI = params.muscle_SI
             elif agent.name == "Adipose":
                 agent.adipose_SI = params.adipose_SI
             elif agent.name == "Liver":
+                agent.liver_SI = params.liver_SI
                 agent.egp_fasting = params.egp_fasting
             elif agent.name == "Gut":
                 agent.V_G = params.V_G
