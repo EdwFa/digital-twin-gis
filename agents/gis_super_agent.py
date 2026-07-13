@@ -35,7 +35,9 @@ class GISSuperAgent:
         state_msg = GISStateMsg(
             glucose_mmol_L=blood_state["glucose"],
             insulin_pmol_L=blood_state["insulin"],
-            glucagon_pmol_L=blood_state["glucagon"]
+            glucagon_pmol_L=blood_state["glucagon"],
+            incretin_pmol_L=blood_state["incretin"],
+            ffa_mmol_L=blood_state["ffa"]
         )
         # self.message_bus.publish(state_msg)
 

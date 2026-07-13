@@ -24,4 +24,6 @@ class GISStateMsg:
     glucose_mmol_L: float
     insulin_pmol_L: float
     glucagon_pmol_L: float
+    incretin_pmol_L: float
+    ffa_mmol_L: float
     # We will expand this as we add more agents
