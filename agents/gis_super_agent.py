@@ -3,8 +3,9 @@ from models.messages import GISStateMsg
 
 class GISSuperAgent:
     """
-    The orchestrator for the Glucose-Insulin System.
-    Manages the strict update order of its sub-agents.
+    Координатор для подсистемы Глюкоза-Инсулин (GIS). Уровень 1.
+    Его главная задача - управлять строгим биологическим порядком 
+    вызова (обновления) всех подчиненных органов (Уровень 2).
     """
     def __init__(self, blood_pool, message_bus: MessageBus):
         self.name = "GIS_SuperAgent"
@@ -12,26 +13,30 @@ class GISSuperAgent:
         self.message_bus = message_bus
         self.subagents = []
         
+        # Регистрация на шине для получения внешних команд
         self.message_bus.register_mailbox(self.name)
 
     def add_subagent(self, agent):
-        """Adds a subagent. Must be added in the correct execution order."""
+        """
+        Добавляет орган в систему.
+        ВАЖНО: Порядок добавления имеет значение, так как определяет порядок симуляции.
+        """
         self.subagents.append(agent)
 
     def _tick(self, current_time, step_size, blood_state):
-        # 1. Read external inputs from the Orchestrator
+        """Ежеминутное обновление координатора."""
+        # 1. Чтение входящих внешних сообщений от Оркестратора
         messages = self.message_bus.consume(self.name)
         
-        # If there are external messages (e.g., MealIntakeMsg), 
-        # broadcast them to internal subagents
+        # Если есть внешние сообщения, транслируем их внутрь подсистемы
         for msg in messages:
             self.message_bus.publish(msg)
             
-        # 2. Update subagents in strict biological order
+        # 2. Обновление дочерних агентов (органов)
         for agent in self.subagents:
             agent._tick(current_time, step_size, blood_state)
             
-        # 3. Publish aggregated state
+        # 3. Публикация агрегированного состояния крови наружу
         state_msg = GISStateMsg(
             glucose_mmol_L=blood_state["glucose"],
             insulin_pmol_L=blood_state["insulin"],
@@ -39,9 +44,14 @@ class GISSuperAgent:
             incretin_pmol_L=blood_state["incretin"],
             ffa_mmol_L=blood_state["ffa"]
         )
+        # В будущем этот Broadcast будет перехвачен Оркестратором (Уровень 0)
         # self.message_bus.publish(state_msg)
 
     def calibrate(self, passport):
+        """
+        Выполняет первоначальную настройку системы под конкретного человека.
+        Проецирует физиологические метрики из Паспорта на математические коэффициенты ОДУ.
+        """
         from core.calibration import calibrate_patient
         params = calibrate_patient(passport)
         
