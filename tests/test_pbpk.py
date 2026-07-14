@@ -116,5 +116,59 @@ class TestLiverPBPK(unittest.TestCase):
         bile_simva_mut = liver_mut.bile_pool.get("simvastatin", 0.0)
         self.assertTrue(bile_simva_mut < bile_simva)
 
+    def test_hypoalbuminemia_increases_clearance(self):
+        """
+        Проверка L4: Динамический расчет свободной фракции (f_u) от уровня альбумина.
+        Если альбумина мало, f_u возрастает, что ведет к ускорению элиминации пропранолола.
+        """
+        blood_norm = BloodPool()
+        liver_norm = LiverPBPKSuperAgent(blood_norm, MessageBus())
+        blood_norm.concentrations["propranolol"] = 10.0
+        blood_norm.concentrations["albumin"] = 40.0 # Норма
+        
+        blood_hypo = BloodPool()
+        liver_hypo = LiverPBPKSuperAgent(blood_hypo, MessageBus())
+        blood_hypo.concentrations["propranolol"] = 10.0
+        blood_hypo.concentrations["albumin"] = 20.0 # Низкий альбумин (свободной фракции в 2 раза больше)
+        
+        liver_norm._tick(0, 1.0, blood_norm.get_state())
+        blood_norm.resolve_step(1.0)
+        
+        liver_hypo._tick(0, 1.0, blood_hypo.get_state())
+        blood_hypo.resolve_step(1.0)
+        
+        c_final_norm = blood_norm.get_concentration("propranolol")
+        c_final_hypo = blood_hypo.get_concentration("propranolol")
+        
+        # При низком альбумине клиренс выше, концентрация должна упасть сильнее
+        self.assertTrue(c_final_hypo < c_final_norm)
+
+    def test_hypothyroidism_decreases_clearance(self):
+        """
+        Проверка L4: Влияние гормонов на метаболизм.
+        Пониженный T3 (гипотиреоз) замедляет работу ферментов (CYP), замедляя элиминацию.
+        """
+        blood_norm = BloodPool()
+        liver_norm = LiverPBPKSuperAgent(blood_norm, MessageBus())
+        blood_norm.concentrations["propranolol"] = 10.0
+        blood_norm.concentrations["T3"] = 2.0 # Норма
+        
+        blood_hypo = BloodPool()
+        liver_hypo = LiverPBPKSuperAgent(blood_hypo, MessageBus())
+        blood_hypo.concentrations["propranolol"] = 10.0
+        blood_hypo.concentrations["T3"] = 1.0 # Гипотиреоз (метаболизм замедлен)
+        
+        liver_norm._tick(0, 1.0, blood_norm.get_state())
+        blood_norm.resolve_step(1.0)
+        
+        liver_hypo._tick(0, 1.0, blood_hypo.get_state())
+        blood_hypo.resolve_step(1.0)
+        
+        c_final_norm = blood_norm.get_concentration("propranolol")
+        c_final_hypo = blood_hypo.get_concentration("propranolol")
+        
+        # При гипотиреозе элиминация замедлена, в крови остается БОЛЬШЕ пропранолола
+        self.assertTrue(c_final_hypo > c_final_norm)
+
 if __name__ == '__main__':
     unittest.main()
