@@ -26,8 +26,11 @@ class TestLiverPBPK(unittest.TestCase):
         
         c_final = blood.get_concentration("propranolol")
         
-        # За 1 минуту концентрация должна упасть примерно на 5.2%
-        expected_c_final = c_initial - (0.8316 / 16.0) * c_initial
+        # За 1 минуту концентрация должна упасть в соответствии с Tube Model:
+        # C_hv = C_in * exp(-CL_int_total * f_u / Q_H) = 10 * exp(-15*0.13 / 1.45) = 2.6058
+        # Eliminated mass = Q_H * (10 - 2.6058) = 10.72159
+        # ΔC = -10.72159 / 16.0 = -0.670099
+        expected_c_final = c_initial - 0.670099
     
         self.assertTrue(abs(c_final - expected_c_final) < 0.01, f"Expected {expected_c_final}, got {c_final}")
         self.assertTrue(c_final < c_initial, "Концентрация должна уменьшиться из-за печеночного клиренса")
@@ -49,6 +52,33 @@ class TestLiverPBPK(unittest.TestCase):
         blood.resolve_step(1.0)
         
         self.assertTrue(blood.concentrations["glucose"] > 4.5)
+
+    def test_ddi_simvastatin_furanocoumarin(self):
+        """
+        Проверка лекарственного взаимодействия (DDI):
+        Грейпфрутовый сок (фуранокумарины) подавляет CYP3A4, замедляя элиминацию симвастатина.
+        """
+        blood_normal = BloodPool()
+        liver_normal = LiverPBPKSuperAgent(blood_normal, MessageBus())
+        blood_normal.concentrations["simvastatin"] = 10.0
+        
+        blood_ddi = BloodPool()
+        liver_ddi = LiverPBPKSuperAgent(blood_ddi, MessageBus())
+        blood_ddi.concentrations["simvastatin"] = 10.0
+        blood_ddi.concentrations["furanocoumarins"] = 1.0 # Ингибитор присутствует
+        
+        liver_normal._tick(0, 1.0, blood_normal.get_state())
+        blood_normal.resolve_step(1.0)
+        
+        liver_ddi._tick(0, 1.0, blood_ddi.get_state())
+        blood_ddi.resolve_step(1.0)
+        
+        c_final_normal = blood_normal.get_concentration("simvastatin")
+        c_final_ddi = blood_ddi.get_concentration("simvastatin")
+        
+        # С ингибитором концентрация должна быть ВЫШЕ (элиминация медленнее)
+        self.assertTrue(c_final_ddi > c_final_normal)
+        self.assertTrue(c_final_ddi < 10.0) # Но элиминация все равно происходит
 
 if __name__ == '__main__':
     unittest.main()
