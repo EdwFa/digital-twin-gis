@@ -12,7 +12,7 @@ from models.messages import MealIntakeMsg
 from models.passport import PatientPassport_GIS
 from agents.gis_super_agent import GISSuperAgent
 from agents.pancreas import PancreasAgent
-from agents.liver import LiverAgent
+from agents.liver_pbpk import LiverPBPKSuperAgent
 from agents.muscle import MuscleAgent
 from agents.brain import BrainAgent
 from agents.gut import GutAgent
@@ -35,7 +35,7 @@ def run():
     gis = GISSuperAgent(blood, msg_bus)
     gis.add_subagent(GutAgent(blood, msg_bus))
     gis.add_subagent(PancreasAgent(blood, msg_bus))
-    gis.add_subagent(LiverAgent(blood, msg_bus))
+    gis.add_subagent(LiverPBPKSuperAgent(blood, msg_bus))
     gis.add_subagent(MuscleAgent(blood, msg_bus))
     gis.add_subagent(BrainAgent(blood, msg_bus))
     gis.add_subagent(AdiposeAgent(blood, msg_bus))

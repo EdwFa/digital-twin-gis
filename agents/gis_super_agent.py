@@ -60,7 +60,7 @@ class GISSuperAgent:
                 agent.muscle_SI = params.muscle_SI
             elif agent.name == "Adipose":
                 agent.adipose_SI = params.adipose_SI
-            elif agent.name == "Liver":
+            elif agent.name in ["Liver", "LiverPBPK"]:
                 agent.liver_SI = params.liver_SI
                 agent.egp_fasting = params.egp_fasting
             elif agent.name == "Gut":

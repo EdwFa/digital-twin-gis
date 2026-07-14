@@ -8,7 +8,7 @@ from core.engine import SimulationEngine
 from core.blood_pool import BloodPool
 from agents.gis_super_agent import GISSuperAgent
 from agents.pancreas import PancreasAgent
-from agents.liver import LiverAgent
+from agents.liver_pbpk import LiverPBPKSuperAgent
 from agents.muscle import MuscleAgent
 from agents.brain import BrainAgent
 from agents.gut import GutAgent
@@ -25,7 +25,7 @@ def setup_gis(passport=None):
     gis = GISSuperAgent(blood, msg_bus)
     gis.add_subagent(GutAgent(blood, msg_bus))
     gis.add_subagent(PancreasAgent(blood, msg_bus))
-    gis.add_subagent(LiverAgent(blood, msg_bus))
+    gis.add_subagent(LiverPBPKSuperAgent(blood, msg_bus))
     gis.add_subagent(MuscleAgent(blood, msg_bus))
     gis.add_subagent(BrainAgent(blood, msg_bus))
     gis.add_subagent(AdiposeAgent(blood, msg_bus))
@@ -116,7 +116,7 @@ class TestGISValidation(unittest.TestCase):
 
     def test_glycogen_depletion(self):
         engine, blood, msg_bus = setup_gis()
-        liver = next(a for a in engine.agents[0].subagents if a.name == "Liver")
+        liver = next(a for a in engine.agents[0].subagents if a.name == "LiverPBPK")
         
         # Fast for 48 hours (2880 mins)
         engine.run(2880)

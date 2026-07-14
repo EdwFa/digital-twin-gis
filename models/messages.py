@@ -41,3 +41,18 @@ class AdaptationMsg:
     """
     beta_mass_multiplier: float             # Множитель массы бета-клеток (падает при глюкотоксичности)
     insulin_sensitivity_multiplier: float   # Множитель чувствительности к инсулину (падает при липотоксичности)
+
+@dataclass
+class DrugAdministrationMsg:
+    """Сообщение о приеме лекарства (Фармакокинетика)."""
+    substance: str
+    dose_mg: float
+    route: str = "oral"
+    formulation: str = "tablet"
+    
+@dataclass
+class PortalVeinInflowMsg:
+    """Сообщение о поступлении веществ из воротной вены в печень."""
+    blood_flow_L_min: float
+    substances_mmol_L: dict  # {"glucose": 6.5, "ethanol": 0.0, "drug_X": ...}
+

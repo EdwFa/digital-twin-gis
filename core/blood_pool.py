@@ -2,53 +2,85 @@ class BloodPool:
     """
     Класс BloodPool (Кровяной Пул).
     Выступает в качестве центральной среды (плазмы крови), в которую органы выделяют 
-    или из которой поглощают метаболиты и гормоны.
+    или из которой поглощают метаболиты, гормоны и лекарства.
+    Поддерживает динамический реестр веществ (PBPK-архитектура).
     """
     def __init__(self):
-        # Базовые (тощаковые) концентрации веществ в крови
-        self.glucose = 5.0  # Глюкоза (ммоль/Л)
-        self.insulin = 60.0 # Инсулин (пмоль/Л)
-        self.glucagon = 50.0 # Глюкагон (пг/мл)
-        self.incretin = 10.0 # Инкретин / GLP-1 (пмоль/Л)
-        self.ffa = 0.4 # Свободные жирные кислоты / FFA (ммоль/Л)
+        # Универсальный реестр концентраций веществ
+        self.concentrations = {
+            "glucose": 5.0,    # Глюкоза (ммоль/Л)
+            "insulin": 60.0,   # Инсулин (пмоль/Л)
+            "glucagon": 50.0,  # Глюкагон (пг/мл)
+            "incretin": 10.0,  # Инкретин / GLP-1 (пмоль/Л)
+            "ffa": 0.4         # Свободные жирные кислоты / FFA (ммоль/Л)
+        }
         
         # Буферы изменений (дельта) для шага численного интегрирования (Euler step)
-        # Органы не меняют концентрации напрямую, они добавляют изменения в эти буферы
-        self._g_delta = 0.0
-        self._i_delta = 0.0
-        self._glu_delta = 0.0
-        self._inc_delta = 0.0
-        self._ffa_delta = 0.0
-        
-    def add_glucose_delta(self, amount):
-        """Добавить изменение концентрации глюкозы (ммоль/Л/мин)."""
-        self._g_delta += amount
-        
-    def add_insulin_delta(self, amount):
-        """Добавить изменение концентрации инсулина (пмоль/Л/мин)."""
-        self._i_delta += amount
-        
-    def add_glucagon_delta(self, amount):
-        """Добавить изменение концентрации глюкагона (пг/мл/мин)."""
-        self._glu_delta += amount
+        self.deltas = {
+            "glucose": 0.0,
+            "insulin": 0.0,
+            "glucagon": 0.0,
+            "incretin": 0.0,
+            "ffa": 0.0
+        }
 
-    def add_incretin_delta(self, amount):
-        """Добавить изменение концентрации инкретинов (пмоль/Л/мин)."""
-        self._inc_delta += amount
+    # ==========================================
+    # PBPK ИНТЕРФЕЙС (Фаза 3)
+    # ==========================================
+    def add_delta(self, substance: str, amount: float):
+        """Добавить изменение концентрации произвольного вещества."""
+        if substance not in self.deltas:
+            self.deltas[substance] = 0.0
+            if substance not in self.concentrations:
+                self.concentrations[substance] = 0.0
+        self.deltas[substance] += amount
 
-    def add_ffa_delta(self, amount):
-        """Добавить изменение концентрации свободных жирных кислот (ммоль/Л/мин)."""
-        self._ffa_delta += amount
+    def get_concentration(self, substance: str) -> float:
+        """Получить текущую концентрацию произвольного вещества."""
+        return self.concentrations.get(substance, 0.0)
+
+    # ==========================================
+    # ОБРАТНАЯ СОВМЕСТИМОСТЬ (Для Фазы 2 ГИС)
+    # ==========================================
+    @property
+    def glucose(self): return self.get_concentration("glucose")
+    
+    @glucose.setter
+    def glucose(self, val): self.concentrations["glucose"] = val
+    
+    @property
+    def insulin(self): return self.get_concentration("insulin")
+    
+    @insulin.setter
+    def insulin(self, val): self.concentrations["insulin"] = val
+    
+    @property
+    def glucagon(self): return self.get_concentration("glucagon")
+    
+    @glucagon.setter
+    def glucagon(self, val): self.concentrations["glucagon"] = val
+    
+    @property
+    def incretin(self): return self.get_concentration("incretin")
+    
+    @incretin.setter
+    def incretin(self, val): self.concentrations["incretin"] = val
+    
+    @property
+    def ffa(self): return self.get_concentration("ffa")
+    
+    @ffa.setter
+    def ffa(self, val): self.concentrations["ffa"] = val
+
+    def add_glucose_delta(self, amount): self.add_delta("glucose", amount)
+    def add_insulin_delta(self, amount): self.add_delta("insulin", amount)
+    def add_glucagon_delta(self, amount): self.add_delta("glucagon", amount)
+    def add_incretin_delta(self, amount): self.add_delta("incretin", amount)
+    def add_ffa_delta(self, amount): self.add_delta("ffa", amount)
         
     def get_state(self):
         """Получить текущее состояние всех биомаркеров крови (read-only снимок)."""
-        return {
-            "glucose": self.glucose,
-            "insulin": self.insulin,
-            "glucagon": self.glucagon,
-            "incretin": self.incretin,
-            "ffa": self.ffa
-        }
+        return self.concentrations.copy()
         
     def resolve_step(self, step_size_min):
         """
@@ -56,16 +88,8 @@ class BloodPool:
         Используется простейший метод Эйлера для численного интегрирования ОДУ.
         Значения не могут опускаться ниже нуля (max(0.0, ...)).
         """
-        # Применение дельт (интеграция)
-        self.glucose = max(0.0, self.glucose + self._g_delta * step_size_min)
-        self.insulin = max(0.0, self.insulin + self._i_delta * step_size_min)
-        self.glucagon = max(0.0, self.glucagon + self._glu_delta * step_size_min)
-        self.incretin = max(0.0, self.incretin + self._inc_delta * step_size_min)
-        self.ffa = max(0.0, self.ffa + self._ffa_delta * step_size_min)
-        
-        # Сброс буферов после применения для следующего шага
-        self._g_delta = 0.0
-        self._i_delta = 0.0
-        self._glu_delta = 0.0
-        self._inc_delta = 0.0
-        self._ffa_delta = 0.0
+        for substance, delta in self.deltas.items():
+            current = self.concentrations.get(substance, 0.0)
+            self.concentrations[substance] = max(0.0, current + delta * step_size_min)
+            # Сброс буфера после применения
+            self.deltas[substance] = 0.0
