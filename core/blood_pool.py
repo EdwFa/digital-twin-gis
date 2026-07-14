@@ -23,6 +23,28 @@ class BloodPool:
             "incretin": 0.0,
             "ffa": 0.0
         }
+        
+        # ==========================================
+        # ГЕМОДИНАМИКА (Фаза 3 - CVS)
+        # ==========================================
+        self.hemodynamics = {
+            "heart_rate": 70.0,            # Пульс (уд/мин)
+            "stroke_volume": 70.0,         # Ударный объем (мл)
+            "cardiac_output": 4.9,         # Сердечный выброс (Л/мин) = HR * SV / 1000
+            "mean_arterial_pressure": 90.0,# Среднее артериальное давление (MAP, мм рт. ст.)
+            "total_peripheral_resistance": 90.0 / 4.9 # TPR = MAP / CO
+        }
+        
+        # Распределение кровотока (Фракции от Cardiac Output)
+        self.blood_flow_fractions = {
+            "liver": 0.25,     # 25% печени
+            "kidney": 0.20,    # 20% почкам
+            "brain": 0.15,     # 15% мозгу
+            "muscle": 0.20,    # 20% мышцам
+            "adipose": 0.05,   # 5% жиру
+            "gut": 0.10,       # 10% кишечнику
+            "other": 0.05      # Остальное
+        }
 
     # ==========================================
     # PBPK ИНТЕРФЕЙС (Фаза 3)
@@ -79,8 +101,15 @@ class BloodPool:
     def add_ffa_delta(self, amount): self.add_delta("ffa", amount)
         
     def get_state(self):
-        """Получить текущее состояние всех биомаркеров крови (read-only снимок)."""
-        return self.concentrations.copy()
+        """Получить текущее состояние всех биомаркеров и гемодинамики."""
+        state = self.concentrations.copy()
+        state.update(self.hemodynamics)
+        return state
+        
+    def get_regional_blood_flow(self, organ_name: str) -> float:
+        """Получить локальный кровоток органа (Л/мин) на основе Cardiac Output и фракции органа."""
+        fraction = self.blood_flow_fractions.get(organ_name, 0.0)
+        return self.hemodynamics["cardiac_output"] * fraction
         
     def resolve_step(self, step_size_min):
         """
