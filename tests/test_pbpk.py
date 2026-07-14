@@ -80,5 +80,41 @@ class TestLiverPBPK(unittest.TestCase):
         self.assertTrue(c_final_ddi > c_final_normal)
         self.assertTrue(c_final_ddi < 10.0) # Но элиминация все равно происходит
 
+    def test_oatp_polymorphism_and_biliary_excretion(self):
+        """
+        Проверка L3: Клеточные транспортеры и полиморфизм.
+        1. Сравниваем нормальный генотип OATP1B1 с мутацией *5 (сниженный захват).
+        2. Проверяем, что симвастатин накапливается в желчи (bile_pool).
+        """
+        blood_wt = BloodPool()
+        liver_wt = LiverPBPKSuperAgent(blood_wt, MessageBus())
+        blood_wt.concentrations["simvastatin"] = 10.0
+        
+        blood_mut = BloodPool()
+        liver_mut = LiverPBPKSuperAgent(blood_mut, MessageBus())
+        blood_mut.concentrations["simvastatin"] = 10.0
+        # Пациент с полиморфизмом OATP1B1*5 (сниженная активность в 2.5 раза)
+        liver_mut.genotype["OATP1B1"] = 0.4 
+        
+        liver_wt._tick(0, 1.0, blood_wt.get_state())
+        blood_wt.resolve_step(1.0)
+        
+        liver_mut._tick(0, 1.0, blood_mut.get_state())
+        blood_mut.resolve_step(1.0)
+        
+        c_final_wt = blood_wt.get_concentration("simvastatin")
+        c_final_mut = blood_mut.get_concentration("simvastatin")
+        
+        # У мутанта захват хуже, поэтому в крови должно остаться БОЛЬШЕ статина
+        self.assertTrue(c_final_mut > c_final_wt)
+        
+        # Проверяем экскрецию в желчь у дикого типа
+        bile_simva = liver_wt.bile_pool.get("simvastatin", 0.0)
+        self.assertTrue(bile_simva > 0.0, "Симвастатин должен экскретироваться в желчь")
+        
+        # У мутанта в желчь должно попасть МЕНЬШЕ статина (т.к. он хуже захватывается из крови)
+        bile_simva_mut = liver_mut.bile_pool.get("simvastatin", 0.0)
+        self.assertTrue(bile_simva_mut < bile_simva)
+
 if __name__ == '__main__':
     unittest.main()
