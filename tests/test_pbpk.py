@@ -170,5 +170,57 @@ class TestLiverPBPK(unittest.TestCase):
         # При гипотиреозе элиминация замедлена, в крови остается БОЛЬШЕ пропранолола
         self.assertTrue(c_final_hypo > c_final_norm)
 
+    def test_cirrhosis_child_pugh_c(self):
+        """
+        Проверка L5: Цирроз (Child-Pugh C).
+        Одновременно падают: Q_H (кровоток), Albumin (свободная фракция растет), CYP_activities (клиренс падает).
+        """
+        blood_norm = BloodPool()
+        liver_norm = LiverPBPKSuperAgent(blood_norm, MessageBus())
+        blood_norm.concentrations["propranolol"] = 10.0
+        
+        blood_cirrhosis = BloodPool()
+        liver_cirrhosis = LiverPBPKSuperAgent(blood_cirrhosis, MessageBus())
+        blood_cirrhosis.concentrations["propranolol"] = 10.0
+        liver_cirrhosis.pathologies["cirrhosis_child_pugh"] = "C"
+        
+        liver_norm._tick(0, 1.0, blood_norm.get_state())
+        blood_norm.resolve_step(1.0)
+        
+        liver_cirrhosis._tick(0, 1.0, blood_cirrhosis.get_state())
+        blood_cirrhosis.resolve_step(1.0)
+        
+        c_final_norm = blood_norm.get_concentration("propranolol")
+        c_final_cirrhosis = blood_cirrhosis.get_concentration("propranolol")
+        
+        # Из-за критического падения CYP и Q_H, элиминация при циррозе сильно замедлена, несмотря на рост f_u
+        self.assertTrue(c_final_cirrhosis > c_final_norm)
+
+    def test_alcohol_cyp2e1_induction(self):
+        """
+        Проверка L5: Индукция алкоголем фермента CYP2E1.
+        Ускоряет метаболизм парацетамола.
+        """
+        blood_norm = BloodPool()
+        liver_norm = LiverPBPKSuperAgent(blood_norm, MessageBus())
+        blood_norm.concentrations["paracetamol"] = 20.0
+        
+        blood_alcohol = BloodPool()
+        liver_alcohol = LiverPBPKSuperAgent(blood_alcohol, MessageBus())
+        blood_alcohol.concentrations["paracetamol"] = 20.0
+        liver_alcohol.pathologies["alcohol_induction"] = 3.0 # Хронический алкоголизм (CYP2E1 x3)
+        
+        liver_norm._tick(0, 1.0, blood_norm.get_state())
+        blood_norm.resolve_step(1.0)
+        
+        liver_alcohol._tick(0, 1.0, blood_alcohol.get_state())
+        blood_alcohol.resolve_step(1.0)
+        
+        c_final_norm = blood_norm.get_concentration("paracetamol")
+        c_final_alcohol = blood_alcohol.get_concentration("paracetamol")
+        
+        # У алкоголика CYP2E1 работает в 3 раза активнее, концентрация парацетамола падает быстрее
+        self.assertTrue(c_final_alcohol < c_final_norm)
+
 if __name__ == '__main__':
     unittest.main()
